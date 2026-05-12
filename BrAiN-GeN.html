@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>BrAiN-GEN 3.1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+html,body{margin:0;padding:0;height:100%;width:100%;background:linear-gradient(135deg,#1e1e2f,#3a3a5a);font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#fff;display:flex;justify-content:center;align-items:center}
+#container{background:rgba(0,0,0,0.85);border-radius:20px;padding:24px 20px;box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;align-items:center;text-align:center;width:90vw;max-width:440px;min-height:80vh;box-sizing:border-box}
+h1{margin:0 0 2px;font-size:1.8em;letter-spacing:2px}
+.subtitle{color:#aaa;font-size:0.85em;margin-bottom:18px}
+
+.field-group{width:88%;margin-bottom:10px;text-align:left}
+.field-group label{font-size:0.78em;color:#aaa;display:block;margin-bottom:3px;padding-left:2px}
+.field-group input{width:100%;border-radius:10px;padding:10px 12px;font-size:0.95em;box-sizing:border-box;background:#1a1a2e;border:2px solid #444;color:#fff;outline:none;transition:border 0.2s}
+.field-group input:focus{border-color:#ff6a00}
+.field-group input::placeholder{color:#555}
+
+.row{display:flex;gap:10px;width:88%}
+.row .field-group{width:50%;margin-bottom:10px}
+
+button.main-btn{width:88%;background:linear-gradient(45deg,#ff6a00,#ee0979);border:none;border-radius:12px;padding:12px;font-size:1em;color:#ffa;cursor:pointer;margin-top:6px;transition:0.3s;font-weight:bold;letter-spacing:1px}
+button.main-btn:hover{transform:scale(1.04);box-shadow:0 5px 15px rgba(0,0,0,0.4)}
+
+#spinner{display:none;margin-top:12px;font-size:0.88em;color:#ffcc00}
+
+#output{display:none;margin-top:14px;background:rgba(255,255,255,0.08);padding:14px;border-radius:12px;word-wrap:break-word;font-size:0.92em;width:88%;box-sizing:border-box;text-align:left;line-height:1.9em}
+#output .label{color:#aaa;font-size:0.78em;display:block}
+#output .value{color:#fff;font-weight:bold}
+#output .warning{color:#ffcc00;font-size:0.85em}
+
+#copy-btn{width:100%;background:#ffcc00;color:#222;border:none;border-radius:12px;padding:10px 20px;cursor:pointer;margin-top:10px;font-size:0.95em;font-weight:bold;transition:0.3s}
+#copy-btn:hover{background:#ffdb4d;transform:scale(1.04)}
+
+footer{margin-top:auto;padding-top:16px;color:#555;font-size:0.72em;line-height:1.6em}
+</style>
+</head>
+<body>
+<div id="container">
+  <h1>BrAiN-GEN</h1>
+  <div class="subtitle">v3.1 · Your Secure Password Manager</div>
+
+  <div id="form-area">
+    <div class="field-group">
+      <label>Input (z.B. github.com) *</label>
+      <input id="inputData" placeholder="github.com" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="row">
+      <div class="field-group">
+        <label>Special Characters</label>
+        <input id="inputSZ" placeholder="!?" value="!?" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field-group">
+        <label>Password Length</label>
+        <input id="inputLen" placeholder="16" value="16" type="number" min="4" max="64" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>PrivateKey (optional)</label>
+      <input id="inputKey" placeholder="optional" type="password" autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+
+  <button class="main-btn" id="mainBtn" onclick="BrAiN_GEN()">Generate</button>
+  <div id="spinner">⏳ Generating… (PBKDF2 310k iterations)</div>
+  <div id="output"></div>
+
+  <footer>
+    PBKDF2-SHA256 · 310.000 Iterations<br>
+    Version 3.1 · 2025 · (c) BrAiNee
+  </footer>
+</div>
+
+<script>
+// Hardcoded defaults – leer lassen damit User-Input gilt
+const SonderzeichenHard = "";
+const PrivateKeyHard    = "";
+const pwlengthHard      = "";
+
+let strHash5 = "";
+
+async function SHA256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(x => x.toString(16).padStart(2,'0')).join('');
+}
+
+async function PBKDF2_hex(password, salt, iterations = 310000, keyLen = 32) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations },
+    keyMaterial, keyLen * 8
+  );
+  return Array.from(new Uint8Array(bits)).map(x => x.toString(16).padStart(2,'0')).join('');
+}
+
+async function BrAiN_GEN() {
+  const strString     = document.getElementById("inputData").value.trim();
+  const Sonderzeichen = SonderzeichenHard || document.getElementById("inputSZ").value;
+  const pwlength      = pwlengthHard ? parseInt(pwlengthHard) : (parseInt(document.getElementById("inputLen").value) || 16);
+  const PrivateKey    = PrivateKeyHard || document.getElementById("inputKey").value;
+
+  if (!strString) { alert("[BrAiN-GEN 3.1]\nError: Input fehlt!"); return; }
+
+  document.getElementById("spinner").style.display = "block";
+  document.getElementById("output").style.display  = "none";
+
+  const salt       = await SHA256(strString);
+  const pwMaterial = strString + PrivateKey;
+  const hexHash    = await PBKDF2_hex(pwMaterial, salt);
+
+  const sZlength  = Math.floor(Sonderzeichen.length / 2);
+  const pwlength2 = pwlength - Sonderzeichen.length;
+  strHash5 = Sonderzeichen
+    ? Sonderzeichen.substring(0, sZlength) + hexHash.substring(0, pwlength2) + Sonderzeichen.substring(Sonderzeichen.length - sZlength)
+    : hexHash.substring(0, pwlength2);
+
+  const keyDisplay = PrivateKeyHard
+    ? "<span class='warning'>⚠ Hardcoded – remember it</span>"
+    : (PrivateKey ? "<span class='warning'>⚠ User Input – remember it</span>" : "None");
+
+  document.getElementById("spinner").style.display = "none";
+  document.getElementById("output").style.display  = "block";
+  document.getElementById("output").innerHTML = `
+    <span class="label">Special Characters</span>
+    <span class="value">${Sonderzeichen || "—"}</span>
+    <span class="label">Password Length</span>
+    <span class="value">${pwlength}</span>
+    <span class="label">Hash</span>
+    <span class="value">PBKDF2-SHA256 (310k iter)</span>
+    <span class="label">PrivateKey</span>
+    <span class="value">${keyDisplay}</span>
+    <button id="copy-btn" onclick="CopyPassword()">Copy Password</button>`;
+
+  document.getElementById("form-area").style.display = "none";
+  const btn = document.getElementById("mainBtn");
+  btn.textContent = "↺ Reset";
+  btn.onclick = () => { navigator.clipboard.writeText(""); location.reload(); };
+}
+
+function CopyPassword() {
+  navigator.clipboard.writeText(strHash5);
+  const btn = document.getElementById("copy-btn");
+  const old = btn.textContent;
+  btn.textContent = strHash5;
+  setTimeout(() => btn.textContent = old, 2000);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("#form-area input").forEach(el => {
+    el.addEventListener("keydown", e => { if (e.key === "Enter") BrAiN_GEN(); });
+  });
+});
+</script>
+</body>
+</html>
