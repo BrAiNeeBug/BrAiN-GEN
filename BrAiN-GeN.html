@@ -82,7 +82,7 @@ footer a:hover{color:#aaa}
     <div class="row">
       <div class="field-group">
         <label>Special Characters</label>
-        <input id="inputSZ" placeholder="?!" value="?!" autocomplete="off" spellcheck="false">
+        <input id="inputSZ" placeholder="1!" value="1!" autocomplete="off" spellcheck="false">
       </div>
       <div class="field-group">
         <label>Password Length</label>
@@ -91,7 +91,7 @@ footer a:hover{color:#aaa}
     </div>
 
     <div class="field-group">
-      <label>PrivateKey</label>
+      <label>PrivateKey <span style="color:#666;font-size:0.85em">(saveable in browser)</span></label>
       <input id="inputKey" placeholder="(optional)" type="password" autocomplete="off" spellcheck="false">
     </div>
 
@@ -235,6 +235,21 @@ function CopyPassword() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Gespeicherte Werte laden
+  const savedSZ  = localStorage.getItem("brainSZ");
+  const savedLen = localStorage.getItem("brainLen");
+  if (savedSZ  !== null) document.getElementById("inputSZ").value  = savedSZ;
+  if (savedLen !== null) document.getElementById("inputLen").value = savedLen;
+
+  // Bei Änderung sofort speichern
+  document.getElementById("inputSZ").addEventListener("input", () => {
+    localStorage.setItem("brainSZ", document.getElementById("inputSZ").value);
+  });
+  document.getElementById("inputLen").addEventListener("input", () => {
+    localStorage.setItem("brainLen", document.getElementById("inputLen").value);
+  });
+
+  // Enter-Taste
   document.querySelectorAll("#form-area input:not([type=checkbox])").forEach(el => {
     el.addEventListener("keydown", e => { if (e.key === "Enter") BrAiN_GEN(); });
   });
